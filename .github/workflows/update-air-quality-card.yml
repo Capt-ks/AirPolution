@@ -17,8 +17,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
+      - name: Install ImageMagick and jq
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq
 
       - name: Download background and logo
         run: |
@@ -30,35 +30,39 @@ jobs:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
           # Fetch data
-          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/130815?fields=pm2.5_atm%2Ctemperature%2Chumidity%2Clast_seen")
-          PM25=$(echo $DATA | jq '.sensor.pm2.5_atm // 0' | awk '{printf "%.1f", $1}')
-          TEMP=$(echo $DATA | jq '.sensor.temperature // empty' | awk '{printf "%.1f°F", $1}')
-          HUM=$(echo $DATA | jq '.sensor.humidity // empty' | awk '{printf "%.0f%%", $1}')
-          UPDATE=$(date -d "@$(echo $DATA | jq '.sensor.last_seen')" "+%b %d, %Y %I:%M %p")
+          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/130815?fields=pm2.5_atm,temperature,humidity,last_seen")
+          echo "$DATA" | jq .
 
-          # Determine AQI color and level
-          if (( $(awk 'BEGIN {print ('$PM25' <= 12)}') )); then COLOR="#00e400"; LEVEL="Good"; DESC="Air quality is satisfactory"
-          elif (( $(awk 'BEGIN {print ('$PM25' <= 35.4)}') )); then COLOR="#ffff00"; LEVEL="Moderate"; DESC="Acceptable; caution for sensitive"
-          elif (( $(awk 'BEGIN {print ('$PM25' <= 55.4)}') )); then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive"; DESC="Reduce outdoor activity"
-          elif (( $(awk 'BEGIN {print ('$PM25' <= 150.4)}') )); then COLOR="#ff0000"; LEVEL="Unhealthy"; DESC="Everyone reduce activity"
-          elif (( $(awk 'BEGIN {print ('$PM25' <= 250.4)}') )); then COLOR="#8f3f97"; LEVEL="Very Unhealthy"; DESC="Avoid outdoor activity"
+          PM25=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // 0' | awk '{printf "%.1f", $1}')
+          TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // empty' | awk '{printf "%.1f°F", $1}')
+          HUM=$(echo "$DATA" | jq -r '.sensor.humidity // empty' | awk '{printf "%.0f%%", $1}')
+          LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen')
+          UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p" 2>/dev/null || echo "Unknown")
+
+          # Determine AQI color, level, and description
+          if [ $(awk "BEGIN {print ($PM25 <= 12)}") -eq 1 ]; then COLOR="#00e400"; LEVEL="Good"; DESC="Air quality is satisfactory"
+          elif [ $(awk "BEGIN {print ($PM25 <= 35.4)}") -eq 1 ]; then COLOR="#ffff00"; LEVEL="Moderate"; DESC="Acceptable; caution for sensitive"
+          elif [ $(awk "BEGIN {print ($PM25 <= 55.4)}") -eq 1 ]; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive"; DESC="Reduce outdoor activity"
+          elif [ $(awk "BEGIN {print ($PM25 <= 150.4)}") -eq 1 ]; then COLOR="#ff0000"; LEVEL="Unhealthy"; DESC="Everyone reduce activity"
+          elif [ $(awk "BEGIN {print ($PM25 <= 250.4)}") -eq 1 ]; then COLOR="#8f3f97"; LEVEL="Very Unhealthy"; DESC="Avoid outdoor activity"
           else COLOR="#7e0023"; LEVEL="Hazardous"; DESC="Health emergency"
           fi
 
-          # Generate card using ImageMagick
+          # Header: Logo left, "RabirubiaWeather" next to it
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.55)' -draw "rectangle 0,0 800,800" \
-            \( logo.png -resize 140x140 \) -geometry +40+30 -composite \
-            -fill white -font DejaVu-Sans-Bold -pointsize 52 -gravity center -annotate +0+0 "Air Quality" \
-            -pointsize 48 -annotate +0+60 "Fajardo, Puerto Rico" \
-            -fill $COLOR -pointsize 140 -annotate +0-150 "$PM25" \
-            -fill white -pointsize 50 -annotate +0-90 "µg/m³ PM2.5" \
-            -fill $COLOR -pointsize 52 -annotate +0-20 "$LEVEL" \
-            -fill white -pointsize 38 -annotate +0+40 "$DESC" \
-            -fill white -pointsize 32 -gravity west -annotate +60+540 "Temperature: $TEMP" \
-            -annotate +60+590 "Humidity: $HUM" \
-            -gravity east -annotate +740+590 "Updated: $UPDATE" \
-            -fill '#a0e4ff' -pointsize 28 -gravity center -annotate +0+300 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            \( logo.png -resize 140x140 \) -geometry +50+50 -composite \
+            -fill white -font DejaVu-Sans-Bold -pointsize 50 -gravity NorthWest -annotate +200+90 "RabirubiaWeather" \
+            -fill white -pointsize 60 -gravity center -annotate +0+150 "Air Quality" \
+            -pointsize 50 -annotate +0+230 "Fajardo, Puerto Rico" \
+            -fill $COLOR -pointsize 160 -annotate +0+20 "$PM25" \
+            -fill white -pointsize 55 -annotate +0+100 "μg/m³ PM2.5" \
+            -fill $COLOR -pointsize 60 -annotate +0+200 "$LEVEL" \
+            -fill white -pointsize 42 -annotate +0+270 "$DESC" \
+            -pointsize 36 -gravity SouthWest -annotate +50+100 "Temperature: $TEMP" \
+            -annotate +50+50 "Humidity: $HUM" \
+            -gravity SouthEast -annotate +50+50 "Updated: $UPDATE" \
+            -fill '#a0e4ff' -pointsize 30 -gravity South -annotate +0+20 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
             card.png
 
       - name: Commit and push updated image
