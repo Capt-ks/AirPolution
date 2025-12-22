@@ -15,34 +15,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install system dependencies for node-canvas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install canvas library
+      - name: Install canvas
         run: npm install canvas
 
-      - name: Generate card image using node-canvas
+      - name: Generate card image
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
           node -e '
           const { createCanvas, loadImage } = require("canvas");
           const fs = require("fs");
-          const fetch = require("node-fetch"); // Node 18+ has fetch built-in, but to be safe
+          const fetch = require("node-fetch");
 
           (async () => {
             const apiKey = process.env.PURPLEAIR_API_KEY;
-            const sensorIndex = 130815;
+            if (!apiKey) throw new Error("No API key provided");
 
-            const res = await fetch(`https://api.purpleair.com/v1/sensors/${sensorIndex}?fields=name,last_seen,pm2.5_atm,temperature,humidity,pressure`, {
+            const sensorIndex = 130815;
+            const response = await fetch(`https://api.purpleair.com/v1/sensors/${sensorIndex}?fields=name,last_seen,pm2.5_atm,temperature,humidity,pressure`, {
               headers: { "X-API-Key": apiKey }
             });
-            if (!res.ok) throw new Error("API error: " + await res.text());
-            const data = await res.json();
+
+            if (!response.ok) {
+              const errText = await response.text();
+              throw new Error(`API error ${response.status}: ${errText}`);
+            }
+
+            const data = await response.json();
             const s = data.sensor;
             const pm25 = parseFloat(s["pm2.5_atm"]) || 0;
+            const temp = s.temperature !== undefined ? s.temperature.toFixed(1) + "°F" : "N/A";
+            const hum = s.humidity !== undefined ? s.humidity.toFixed(0) + "%" : "N/A";
+            const updateStr = new Date(s.last_seen * 1000).toLocaleString();
 
             function getAQIInfo(p) {
               if (p <= 12.0) return { level: "Good", desc: "Air quality is satisfactory", color: "#00e400" };
@@ -53,24 +67,19 @@ jobs:
               return { level: "Hazardous", desc: "Health emergency", color: "#7e0023" };
             }
             const aqi = getAQIInfo(pm25);
-            const updateStr = new Date(s.last_seen * 1000).toLocaleString();
 
             const canvas = createCanvas(800, 800);
             const ctx = canvas.getContext("2d");
 
-            // Load and draw background
             const bg = await loadImage("https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg");
             ctx.drawImage(bg, 0, 0, 800, 800);
 
-            // Overlay
             ctx.fillStyle = "rgba(0,0,0,0.55)";
             ctx.fillRect(0, 0, 800, 800);
 
-            // Load and draw logo
             const logo = await loadImage("https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png");
             ctx.drawImage(logo, 40, 30, 140, 140);
 
-            // Text settings
             ctx.textAlign = "center";
             ctx.fillStyle = "white";
 
@@ -82,6 +91,7 @@ jobs:
             ctx.font = "bold 140px Arial";
             ctx.fillStyle = aqi.color;
             ctx.fillText(pm25.toFixed(1), 400, 330);
+
             ctx.font = "50px Arial";
             ctx.fillStyle = "white";
             ctx.fillText("µg/m³ PM2.5", 400, 390);
@@ -89,6 +99,7 @@ jobs:
             ctx.font = "bold 52px Arial";
             ctx.fillStyle = aqi.color;
             ctx.fillText(aqi.level, 400, 470);
+
             ctx.font = "38px Arial";
             ctx.fillStyle = "white";
             ctx.fillText(aqi.desc, 400, 520);
@@ -96,8 +107,8 @@ jobs:
             ctx.font = "32px Arial";
             ctx.textAlign = "left";
             ctx.fillStyle = "white";
-            ctx.fillText(`Temperature: ${s.temperature ? s.temperature.toFixed(1) + "°F" : "N/A"}`, 60, 600);
-            ctx.fillText(`Humidity: ${s.humidity ? s.humidity.toFixed(0) + "%" : "N/A"}`, 60, 650);
+            ctx.fillText(`Temperature: ${temp}`, 60, 600);
+            ctx.fillText(`Humidity: ${hum}`, 60, 650);
 
             ctx.textAlign = "right";
             ctx.fillText(`Updated: ${updateStr}`, 740, 650);
@@ -107,11 +118,13 @@ jobs:
             ctx.fillStyle = "#a0e4ff";
             ctx.fillText("Source: Local PurpleAir Sensor | RabirubiaWeather", 400, 740);
 
-            // Save to file
             const buffer = canvas.toBuffer("image/png");
             fs.writeFileSync("card.png", buffer);
             console.log("card.png generated successfully");
-          })();
+          })().catch(err => {
+            console.error(err);
+            process.exit(1);
+          });
           '
 
       - name: Commit and push updated image
@@ -119,5 +132,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add card.png
-          git commit -m "Update air quality card image" || echo "No changes"
+          git commit -m "Auto-update air quality card image" || echo "No changes to commit"
           git push
