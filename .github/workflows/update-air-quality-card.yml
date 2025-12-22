@@ -31,38 +31,36 @@ jobs:
         run: |
           # Fetch data
           DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/130815?fields=pm2.5_atm,temperature,humidity,last_seen")
-          echo "$DATA" | jq .
-
           PM25=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // 0' | awk '{printf "%.1f", $1}')
-          TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // empty' | awk '{printf "%.1f°F", $1}')
-          HUM=$(echo "$DATA" | jq -r '.sensor.humidity // empty' | awk '{printf "%.0f%%", $1}')
-          LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen')
-          UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p" 2>/dev/null || echo "Unknown")
+          TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // "N/A"' | awk '{if ($1 != "N/A") printf "%.1f°F", $1; else print "N/A"}')
+          HUM=$(echo "$DATA" | jq -r '.sensor.humidity // "N/A"' | awk '{if ($1 != "N/A") printf "%.0f%%", $1; else print "N/A"}')
+          LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
+          if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p"); fi
 
           # Determine AQI color, level, and description
           if [ $(awk "BEGIN {print ($PM25 <= 12)}") -eq 1 ]; then COLOR="#00e400"; LEVEL="Good"; DESC="Air quality is satisfactory"
-          elif [ $(awk "BEGIN {print ($PM25 <= 35.4)}") -eq 1 ]; then COLOR="#ffff00"; LEVEL="Moderate"; DESC="Acceptable; caution for sensitive"
-          elif [ $(awk "BEGIN {print ($PM25 <= 55.4)}") -eq 1 ]; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive"; DESC="Reduce outdoor activity"
-          elif [ $(awk "BEGIN {print ($PM25 <= 150.4)}") -eq 1 ]; then COLOR="#ff0000"; LEVEL="Unhealthy"; DESC="Everyone reduce activity"
+          elif [ $(awk "BEGIN {print ($PM25 <= 35.4)}") -eq 1 ]; then COLOR="#ffff00"; LEVEL="Moderate"; DESC="Acceptable; caution for sensitive groups"
+          elif [ $(awk "BEGIN {print ($PM25 <= 55.4)}") -eq 1 ]; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive"; DESC="Sensitive groups reduce outdoor activity"
+          elif [ $(awk "BEGIN {print ($PM25 <= 150.4)}") -eq 1 ]; then COLOR="#ff0000"; LEVEL="Unhealthy"; DESC="Everyone reduce outdoor activity"
           elif [ $(awk "BEGIN {print ($PM25 <= 250.4)}") -eq 1 ]; then COLOR="#8f3f97"; LEVEL="Very Unhealthy"; DESC="Avoid outdoor activity"
           else COLOR="#7e0023"; LEVEL="Hazardous"; DESC="Health emergency"
           fi
 
-          # Header: Logo left, "RabirubiaWeather" next to it
+          # Generate card with better spacing and layout
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.55)' -draw "rectangle 0,0 800,800" \
-            \( logo.png -resize 140x140 \) -geometry +50+50 -composite \
-            -fill white -font DejaVu-Sans-Bold -pointsize 50 -gravity NorthWest -annotate +200+90 "RabirubiaWeather" \
-            -fill white -pointsize 60 -gravity center -annotate +0+150 "Air Quality" \
-            -pointsize 50 -annotate +0+230 "Fajardo, Puerto Rico" \
-            -fill $COLOR -pointsize 160 -annotate +0+20 "$PM25" \
-            -fill white -pointsize 55 -annotate +0+100 "μg/m³ PM2.5" \
-            -fill $COLOR -pointsize 60 -annotate +0+200 "$LEVEL" \
-            -fill white -pointsize 42 -annotate +0+270 "$DESC" \
-            -pointsize 36 -gravity SouthWest -annotate +50+100 "Temperature: $TEMP" \
-            -annotate +50+50 "Humidity: $HUM" \
-            -gravity SouthEast -annotate +50+50 "Updated: $UPDATE" \
-            -fill '#a0e4ff' -pointsize 30 -gravity South -annotate +0+20 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +50+50 -composite \
+            -fill white -font DejaVu-Sans-Bold -pointsize 48 -gravity NorthWest -annotate +180+80 "RabirubiaWeather" \
+            -fill white -pointsize 60 -gravity center -annotate +0-200 "Air Quality" \
+            -pointsize 50 -annotate +0-130 "Fajardo, Puerto Rico" \
+            -fill $COLOR -pointsize 160 -annotate +0-40 "$PM25" \
+            -fill white -pointsize 50 -annotate +0+30 "µg/m³ PM2.5" \
+            -fill $COLOR -pointsize 60 -annotate +0+120 "$LEVEL" \
+            -fill white -pointsize 40 -annotate +0+190 "$DESC" \
+            -pointsize 36 -gravity SouthWest -annotate +50+120 "Temperature: $TEMP" \
+            -annotate +50+70 "Humidity: $HUM" \
+            -gravity SouthEast -annotate +50+70 "Updated: $UPDATE" \
+            -fill '#a0e4ff' -pointsize 32 -gravity South -annotate +0+20 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
             card.png
 
       - name: Commit and push updated image
