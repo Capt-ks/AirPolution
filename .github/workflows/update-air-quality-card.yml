@@ -31,33 +31,43 @@ jobs:
         run: |
           # Fetch data from sensor 281250
           DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm,temperature,humidity,last_seen")
-          if ! echo "$DATA" | jq -e . > /dev/null; then
-            echo "Invalid JSON from API"
+          echo "API Response: $DATA"
+
+          # Check if JSON is valid
+          if ! echo "$DATA" | jq . > /dev/null; then
+            echo "Invalid JSON response from API"
             exit 1
           fi
 
-          PM25_RAW=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // null')
-          if [ "$PM25_RAW" = "null" ] || [ -z "$PM25_RAW" ]; then
+          PM25_RAW=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // "null"')
+          if [ "$PM25_RAW" = "null" ]; then
             PM25="—"
             COLOR="#aaaaaa"
             LEVEL="No PM2.5 Data"
           else
-            PM25=$(printf "%.1f" "$PM25_RAW")
-            if awk "BEGIN {exit !($PM25_RAW <= 12)}"; then COLOR="#00e400"; LEVEL="Good"
-            elif awk "BEGIN {exit !($PM25_RAW <= 35.4)}"; then COLOR="#ffff00"; LEVEL="Moderate"
-            elif awk "BEGIN {exit !($PM25_RAW <= 55.4)}"; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive Groups"
-            elif awk "BEGIN {exit !($PM25_RAW <= 150.4)}"; then COLOR="#ff0000"; LEVEL="Unhealthy"
-            elif awk "BEGIN {exit !($PM25_RAW <= 250.4)}"; then COLOR="#8f3f97"; LEVEL="Very Unhealthy"
-            else COLOR="#aaaaaa"; LEVEL="No PM2.5 Data"
+            PM25=$(printf "%.1f" "$PM25_RAW" 2>/dev/null || echo "—")
+            if [ "$PM25" = "—" ]; then
+              COLOR="#aaaaaa"
+              LEVEL="No PM2.5 Data"
+            else
+              if awk "BEGIN {exit !($PM25_RAW <= 12)}"; then COLOR="#00e400"; LEVEL="Good"
+              elif awk "BEGIN {exit !($PM25_RAW <= 35.4)}"; then COLOR="#ffff00"; LEVEL="Moderate"
+              elif awk "BEGIN {exit !($PM25_RAW <= 55.4)}"; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive Groups"
+              elif awk "BEGIN {exit !($PM25_RAW <= 150.4)}"; then COLOR="#ff0000"; LEVEL="Unhealthy"
+              elif awk "BEGIN {exit !($PM25_RAW <= 250.4)}"; then COLOR="#8f3f97"; LEVEL="Very Unhealthy"
+              else COLOR="#aaaaaa"; LEVEL="No PM2.5 Data"
+              fi
             fi
           fi
 
           TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // "N/A"' | awk '{if ($1 != "N/A") printf "%.1f°F", $1; else print "N/A"}')
           HUM=$(echo "$DATA" | jq -r '.sensor.humidity // "N/A"' | awk '{if ($1 != "N/A") printf "%.0f%%", $1; else print "N/A"}')
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
-          if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p"); fi
+          if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p" 2>/dev/null || echo "Unknown"); fi
 
-          # Generate card – clean layout, bright, small footer
+          echo "PM25: $PM25 | LEVEL: $LEVEL | COLOR: $COLOR"
+
+          # Generate card with bright overlay and small footer
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
