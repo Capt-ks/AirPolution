@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install ImageMagick and jq
-        run: sudo apt-get update && sudo apt-get install -y imagemagick jq
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq fonts-dejavu-core
 
       - name: Download background and logo
         run: |
@@ -28,12 +28,14 @@ jobs:
       - name: Fetch PurpleAir data and generate card with ImageMagick
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
         run: |
           # Fetch data from sensor 281250
           DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm,temperature,humidity,last_seen")
           echo "API Response: $DATA"
 
-          # Extract raw PM2.5 (decimal is fine)
+          # Extract raw PM2.5
           PM25_RAW=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // "0"')
           PM25=$(printf "%.1f" "$PM25_RAW")
 
@@ -42,32 +44,14 @@ jobs:
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
           UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p" 2>/dev/null || echo "Unknown")
 
-          # Simple, safe level logic (no awk/bc in conditionals)
-          LEVEL="Very Unhealthy"  # Default max
+          # Determine PM2.5 level
+          LEVEL="Very Unhealthy"
           COLOR="#8f3f97"
-
-          if (( $(echo "$PM25_RAW <= 150.4" | bc -l 2>/dev/null || echo 1) )); then
-            LEVEL="Unhealthy"
-            COLOR="#ff0000"
-          fi
-          if (( $(echo "$PM25_RAW <= 55.4" | bc -l 2>/dev/null || echo 1) )); then
-            LEVEL="Unhealthy for Sensitive Groups"
-            COLOR="#ff7e00"
-          fi
-          if (( $(echo "$PM25_RAW <= 35.4" | bc -l 2>/dev/null || echo 1) )); then
-            LEVEL="Moderate"
-            COLOR="#ffff00"
-          fi
-          if (( $(echo "$PM25_RAW <= 12" | bc -l 2>/dev/null || echo 1) )); then
-            LEVEL="Good"
-            COLOR="#00e400"
-          fi
-
-          if [ "$PM25_RAW" = "0" ] || [ "$PM25_RAW" = "null" ]; then
-            PM25="—"
-            LEVEL="No Data"
-            COLOR="#aaaaaa"
-          fi
+          if (( $(echo "$PM25_RAW <= 150.4" | bc -l 2>/dev/null || echo 1) )); then LEVEL="Unhealthy"; COLOR="#ff0000"; fi
+          if (( $(echo "$PM25_RAW <= 55.4" | bc -l 2>/dev/null || echo 1) )); then LEVEL="Unhealthy for Sensitive Groups"; COLOR="#ff7e00"; fi
+          if (( $(echo "$PM25_RAW <= 35.4" | bc -l 2>/dev/null || echo 1) )); then LEVEL="Moderate"; COLOR="#ffff00"; fi
+          if (( $(echo "$PM25_RAW <= 12" | bc -l 2>/dev/null || echo 1) )); then LEVEL="Good"; COLOR="#00e400"; fi
+          if [ "$PM25_RAW" = "0" ] || [ "$PM25_RAW" = "null" ]; then PM25="—"; LEVEL="No Data"; COLOR="#aaaaaa"; fi
 
           echo "PM25: $PM25 | LEVEL: $LEVEL | COLOR: $COLOR"
 
@@ -75,12 +59,12 @@ jobs:
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
-            -fill white -font DejaVu-Sans-Bold -pointsize 48 -gravity NorthWest -annotate +170+70 "RabirubiaWeather" \
+            -fill white -font DejaVu-Sans-Bold.ttf -pointsize 48 -gravity NorthWest -annotate +170+70 "RabirubiaWeather" \
             -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
             -pointsize 50 -annotate +0-110 "Fajardo, Puerto Rico" \
-            -fill white -pointsize 50 -annotate +0-40 "µg/m³ PM2.5" \
-            -fill $COLOR -pointsize 140 -annotate +0+40 "$PM25" \
-            -fill $COLOR -pointsize 70 -annotate +0+160 "$LEVEL" \
+            -fill white -pointsize 50 -annotate +0-40 "ug/m3 PM2.5" \
+            -fill "$COLOR" -pointsize 140 -annotate +0+40 "$PM25" \
+            -fill "$COLOR" -pointsize 70 -annotate +0+160 "$LEVEL" \
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
