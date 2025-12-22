@@ -37,8 +37,8 @@ jobs:
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
           if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p"); fi
 
-
-          # Generate card – lighter overlay, smaller footer, no desc
+          # Removed all AQI level/color logic – PM2.5 in white, no LEVEL text
+          # Generate card – lighter overlay, smaller footer
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
@@ -46,7 +46,7 @@ jobs:
             -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
             -pointsize 50 -annotate +0-110 "Fajardo, Puerto Rico" \
             -fill white -pointsize 50 -annotate +0-40 "µg/m³ PM2.5" \
-            -fill $COLOR -pointsize 140 -annotate +0+40 "$PM25" \
+            -fill white -pointsize 140 -annotate +0+40 "$PM25" \
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
