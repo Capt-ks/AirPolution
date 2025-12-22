@@ -37,18 +37,18 @@ jobs:
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
           if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p"); fi
 
-          # Determine AQI color and level only (no desc to avoid warnings)
+          # Determine AQI color and level only (no "Hazardous" text or desc)
           if [ $(awk "BEGIN {print ($PM25 <= 12)}") -eq 1 ]; then COLOR="#00e400"; LEVEL="Good"
           elif [ $(awk "BEGIN {print ($PM25 <= 35.4)}") -eq 1 ]; then COLOR="#ffff00"; LEVEL="Moderate"
-          elif [ $(awk "BEGIN {print ($PM25 <= 55.4)}") -eq 1 ]; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive"
+          elif [ $(awk "BEGIN {print ($PM25 <= 55.4)}") -eq 1 ]; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive Groups"
           elif [ $(awk "BEGIN {print ($PM25 <= 150.4)}") -eq 1 ]; then COLOR="#ff0000"; LEVEL="Unhealthy"
           elif [ $(awk "BEGIN {print ($PM25 <= 250.4)}") -eq 1 ]; then COLOR="#8f3f97"; LEVEL="Very Unhealthy"
-          else COLOR="#7e0023"; LEVEL="Hazardous"
+          else COLOR="#ffffff"; LEVEL="Data Unavailable"  # White for no alarming text when offline
           fi
 
-          # Generate card – removed DESC annotate, adjusted spacing
+          # Generate card – lighter overlay, smaller footer, no desc
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
-            -fill 'rgba(0,0,0,0.55)' -draw "rectangle 0,0 800,800" \
+            -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
             -fill white -font DejaVu-Sans-Bold -pointsize 48 -gravity NorthWest -annotate +170+70 "RabirubiaWeather" \
             -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
@@ -59,7 +59,7 @@ jobs:
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
-            -fill '#a0e4ff' -pointsize 32 -gravity South -annotate +0+20 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
             card.png
 
       - name: Commit and push updated image
