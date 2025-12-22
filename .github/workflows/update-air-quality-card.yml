@@ -30,7 +30,7 @@ jobs:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
           # Fetch data
-          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm, pm2.5_cf_1, temperature,humidity,last_seen")
+          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=name,pm2.5_atm,pm2.5_cf_1, temperature,humidity,last_seen")
           PM25=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // 0' | awk '{printf "%.1f", $1}')
           TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // "N/A"' | awk '{if ($1 != "N/A") printf "%.1f°F", $1; else print "N/A"}')
           HUM=$(echo "$DATA" | jq -r '.sensor.humidity // "N/A"' | awk '{if ($1 != "N/A") printf "%.0f%%", $1; else print "N/A"}')
