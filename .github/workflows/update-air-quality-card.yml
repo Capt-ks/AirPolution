@@ -31,13 +31,14 @@ jobs:
         run: |
           # Fetch data from sensor 281250
           DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm,temperature,humidity,last_seen")
+          
           PM25=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // "—"')
           TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // "N/A"' | awk '{if ($1 != "N/A") printf "%.1f°F", $1; else print "N/A"}')
           HUM=$(echo "$DATA" | jq -r '.sensor.humidity // "N/A"' | awk '{if ($1 != "N/A") printf "%.0f%%", $1; else print "N/A"}')
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
           if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p"); fi
 
-          # Generate card – only PM2.5 value, no level/color logic
+          # Generate card – only PM2.5 value (large, white), no level or color logic
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
@@ -49,7 +50,7 @@ jobs:
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
-            -fill '#a0e4ff' -pointsize 22 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
             card.png
 
       - name: Commit and push updated image
