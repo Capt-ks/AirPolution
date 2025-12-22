@@ -46,20 +46,19 @@ jobs:
           else COLOR="#7e0023"; LEVEL="Hazardous"; DESC="Health emergency"
           fi
 
-          # Generate card with better spacing and layout
+          # Generate card matching the weather card style
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
-            -fill 'rgba(0,0,0,0.55)' -draw "rectangle 0,0 800,800" \
-            \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +50+50 -composite \
-            -fill white -font DejaVu-Sans-Bold -pointsize 48 -gravity NorthWest -annotate +180+80 "RabirubiaWeather" \
-            -fill white -pointsize 60 -gravity center -annotate +0-200 "Air Quality" \
-            -pointsize 50 -annotate +0-130 "Fajardo, Puerto Rico" \
-            -fill $COLOR -pointsize 160 -annotate +0-40 "$PM25" \
-            -fill white -pointsize 50 -annotate +0+30 "µg/m³ PM2.5" \
-            -fill $COLOR -pointsize 60 -annotate +0+120 "$LEVEL" \
-            -fill white -pointsize 40 -annotate +0+190 "$DESC" \
-            -pointsize 36 -gravity SouthWest -annotate +50+120 "Temperature: $TEMP" \
-            -annotate +50+70 "Humidity: $HUM" \
-            -gravity SouthEast -annotate +50+70 "Updated: $UPDATE" \
+            \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
+            -fill white -font DejaVu-Sans-Bold -pointsize 48 -gravity NorthWest -annotate +170+70 "RabirubiaWeather" \
+            -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
+            -pointsize 50 -annotate +0-110 "Fajardo, Puerto Rico" \
+            -fill white -pointsize 50 -annotate +0-40 "µg/m³ PM2.5" \
+            -fill $COLOR -pointsize 140 -annotate +0+40 "$PM25" \
+            -fill $COLOR -pointsize 70 -annotate +0+160 "$LEVEL" \
+            -fill white -pointsize 40 -annotate +0+230 "$DESC" \
+            -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
+            -annotate +40+90 "Humidity: $HUM" \
+            -annotate +40+40 "Updated: $UPDATE" \
             -fill '#a0e4ff' -pointsize 32 -gravity South -annotate +0+20 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
             card.png
 
