@@ -17,83 +17,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies (for libvips/sharp)
-        run: sudo apt-get update && sudo apt-get install -y libvips-dev
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Download background and logo
+        run: |
+          curl -o background.jpg "https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg"
+          curl -o logo.png "https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png"
 
-      - name: Install sharp
-        run: npm install sharp
-
-      - name: Generate card image
+      - name: Fetch PurpleAir data and generate card with ImageMagick
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
-          node -e '
-          const sharp = require("sharp");
+          # Fetch data
+          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/130815?fields=pm2.5_atm%2Ctemperature%2Chumidity%2Clast_seen")
+          PM25=$(echo $DATA | jq '.sensor.pm2.5_atm // 0' | awk '{printf "%.1f", $1}')
+          TEMP=$(echo $DATA | jq '.sensor.temperature // empty' | awk '{printf "%.1f°F", $1}')
+          HUM=$(echo $DATA | jq '.sensor.humidity // empty' | awk '{printf "%.0f%%", $1}')
+          UPDATE=$(date -d "@$(echo $DATA | jq '.sensor.last_seen')" "+%b %d, %Y %I:%M %p")
 
-          (async () => {
-            const apiKey = process.env.PURPLEAIR_API_KEY;
-            if (!apiKey) throw new Error("No API key");
+          # Determine AQI color and level
+          if (( $(awk 'BEGIN {print ('$PM25' <= 12)}') )); then COLOR="#00e400"; LEVEL="Good"; DESC="Air quality is satisfactory"
+          elif (( $(awk 'BEGIN {print ('$PM25' <= 35.4)}') )); then COLOR="#ffff00"; LEVEL="Moderate"; DESC="Acceptable; caution for sensitive"
+          elif (( $(awk 'BEGIN {print ('$PM25' <= 55.4)}') )); then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive"; DESC="Reduce outdoor activity"
+          elif (( $(awk 'BEGIN {print ('$PM25' <= 150.4)}') )); then COLOR="#ff0000"; LEVEL="Unhealthy"; DESC="Everyone reduce activity"
+          elif (( $(awk 'BEGIN {print ('$PM25' <= 250.4)}') )); then COLOR="#8f3f97"; LEVEL="Very Unhealthy"; DESC="Avoid outdoor activity"
+          else COLOR="#7e0023"; LEVEL="Hazardous"; DESC="Health emergency"
+          fi
 
-            const res = await fetch(`https://api.purpleair.com/v1/sensors/130815?fields=pm2.5_atm,temperature,humidity,last_seen`, {
-              headers: { "X-API-Key": apiKey }
-            });
-            if (!res.ok) throw new Error("API error: " + await res.text());
-            const data = await res.json();
-            const s = data.sensor;
-            const pm25 = parseFloat(s.pm2.5_atm) || 0;
-            const temp = s.temperature ? s.temperature.toFixed(1) + "°F" : "N/A";
-            const hum = s.humidity ? s.humidity.toFixed(0) + "%" : "N/A";
-            const updateStr = new Date(s.last_seen * 1000).toLocaleString();
-
-            const aqiColor = pm25 <= 12 ? "#00e400" : pm25 <= 35.4 ? "#ffff00" : pm25 <= 55.4 ? "#ff7e00" : pm25 <= 150.4 ? "#ff0000" : pm25 <= 250.4 ? "#8f3f97" : "#7e0023";
-
-            const aqiLevel = pm25 <= 12 ? "Good" : pm25 <= 35.4 ? "Moderate" : pm25 <= 55.4 ? "Unhealthy for Sensitive" : pm25 <= 150.4 ? "Unhealthy" : pm25 <= 250.4 ? "Very Unhealthy" : "Hazardous";
-
-            const aqiDesc = pm25 <= 12 ? "Air quality is satisfactory" : pm25 <= 35.4 ? "Acceptable; caution for sensitive" : pm25 <= 55.4 ? "Reduce outdoor activity" : pm25 <= 150.4 ? "Everyone reduce activity" : pm25 <= 250.4 ? "Avoid outdoor activity" : "Health emergency";
-
-            const [bgBuffer, logoBuffer] = await Promise.all([
-              (await fetch("https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg")).arrayBuffer(),
-              (await fetch("https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png")).arrayBuffer()
-            ]);
-
-            const svgOverlay = Buffer.from(\`
-            <svg width="800" height="800" xmlns="http://www.w3.org/2000/svg">
-              <rect width="800" height="800" fill="rgba(0,0,0,0.55)"/>
-              <image href="data:image/png;base64,\${Buffer.from(logoBuffer).toString('base64')}" x="40" y="30" width="140" height="140"/>
-              <text x="400" y="100" font-family="Arial" font-size="52" font-weight="bold" fill="white" text-anchor="middle">Air Quality</text>
-              <text x="400" y="160" font-family="Arial" font-size="48" fill="white" text-anchor="middle">Fajardo, Puerto Rico</text>
-              <text x="400" y="330" font-family="Arial" font-size="140" font-weight="bold" fill="\${aqiColor}" text-anchor="middle">\${pm25.toFixed(1)}</text>
-              <text x="400" y="390" font-family="Arial" font-size="50" fill="white" text-anchor="middle">µg/m³ PM2.5</text>
-              <text x="400" y="470" font-family="Arial" font-size="52" font-weight="bold" fill="\${aqiColor}" text-anchor="middle">\${aqiLevel}</text>
-              <text x="400" y="520" font-family="Arial" font-size="38" fill="white" text-anchor="middle">\${aqiDesc}</text>
-              <text x="60" y="600" font-family="Arial" font-size="32" fill="white">Temperature: \${temp}</text>
-              <text x="60" y="650" font-family="Arial" font-size="32" fill="white">Humidity: \${hum}</text>
-              <text x="740" y="650" font-family="Arial" font-size="32" fill="white" text-anchor="end">Updated: \${updateStr}</text>
-              <text x="400" y="740" font-family="Arial" font-size="28" fill="#a0e4ff" text-anchor="middle">Source: Local PurpleAir Sensor | RabirubiaWeather</text>
-            </svg>
-            \`);
-
-            await sharp(Buffer.from(bgBuffer))
-              .composite([{ input: svgOverlay }])
-              .png()
-              .toFile("card.png");
-
-            console.log("card.png generated successfully");
-          })().catch(err => {
-            console.error("Error:", err.message);
-            process.exit(1);
-          });
-          '
+          # Generate card using ImageMagick
+          convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
+            -fill 'rgba(0,0,0,0.55)' -draw "rectangle 0,0 800,800" \
+            \( logo.png -resize 140x140 \) -geometry +40+30 -composite \
+            -fill white -font DejaVu-Sans-Bold -pointsize 52 -gravity center -annotate +0+0 "Air Quality" \
+            -pointsize 48 -annotate +0+60 "Fajardo, Puerto Rico" \
+            -fill $COLOR -pointsize 140 -annotate +0-150 "$PM25" \
+            -fill white -pointsize 50 -annotate +0-90 "µg/m³ PM2.5" \
+            -fill $COLOR -pointsize 52 -annotate +0-20 "$LEVEL" \
+            -fill white -pointsize 38 -annotate +0+40 "$DESC" \
+            -fill white -pointsize 32 -gravity west -annotate +60+540 "Temperature: $TEMP" \
+            -annotate +60+590 "Humidity: $HUM" \
+            -gravity east -annotate +740+590 "Updated: $UPDATE" \
+            -fill '#a0e4ff' -pointsize 28 -gravity center -annotate +0+300 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            card.png
 
       - name: Commit and push updated image
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add card.png
-          git commit -m "Auto-update air quality card image" || echo "No changes"
+          git commit -m "Auto-update air quality card image" || echo "No changes to commit"
           git push
