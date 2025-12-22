@@ -1,179 +1,101 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2575.7">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Current Data from PurpleAir Sensor 130815 - Fajardo Area, PR</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        .value { font-size: 2em; font-weight: bold; color: #333; }
+        .aqi-good { color: green; }
+        .aqi-moderate { color: orange; }
+        .aqi-unhealthy { color: red; }
+        #refreshBtn { padding: 10px 20px; font-size: 1em; cursor: pointer; }
+    </style>
 </head>
 <body>
-<p class="p1">&lt;!DOCTYPE html&gt;</p>
-<p class="p1">&lt;html lang="en"&gt;</p>
-<p class="p1">&lt;head&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;title&gt;Current Air Quality - Fajardo, PR&lt;/title&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;style&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>body {<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>margin: 0;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 0;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>background: #e0f7fa;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>display: flex;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>justify-content: center;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>align-items: center;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>min-height: 100vh;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-family: Arial, sans-serif;<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.card-container {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>width: 90vw;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>max-width: 800px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>aspect-ratio: 1 / 1;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>box-shadow: 0 4px 12px rgba(0,0,0,0.3);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>overflow: hidden;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>position: relative;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>canvas {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>width: 100%;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>height: 100%;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>object-fit: contain;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>#status {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>position: absolute;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>top: 10px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>left: 50%;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>transform: translateX(-50%);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>background: rgba(0,0,0,0.7);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>color: white;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>padding: 8px 16px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>border-radius: 5px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-size: 14px;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>font-weight: bold;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>z-index: 10;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</p>
-<p class="p1">&lt;/head&gt;</p>
-<p class="p1">&lt;body&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;div id="status"&gt;Loading PurpleAir sensor data...&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="card-container"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;canvas id="airCard"&gt;&lt;/canvas&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;script&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const apiKey = '09ECFAA9-DF2D-11F0-B596-4201AC1DC123'; // Replace with your PurpleAir READ API key</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const sensorIndex = 130815;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>const canvas = document.getElementById('airCard');</p>
-<p class="p1"><span class="Apple-converted-space">        </span>canvas.width = 800;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>canvas.height = 800;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const ctx = canvas.getContext('2d');</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const statusDiv = document.getElementById('status');</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>// High-quality tropical beach background (Seven Seas Beach, Fajardo, PR - royalty-free usable)</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const backgroundImg = new Image();</p>
-<p class="p1"><span class="Apple-converted-space">        </span>backgroundImg.crossOrigin = 'anonymous';</p>
-<p class="p1"><span class="Apple-converted-space">        </span>backgroundImg.src = 'https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg';</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>// RabirubiaWeather logo</p>
-<p class="p1"><span class="Apple-converted-space">        </span>const logoImg = new Image();</p>
-<p class="p1"><span class="Apple-converted-space">        </span>logoImg.crossOrigin = 'anonymous';</p>
-<p class="p1"><span class="Apple-converted-space">        </span>logoImg.src = 'https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png';</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>function getAQIInfo(pm25) {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (pm25 &lt;= 12.0) return { level: 'Good', desc: 'Air quality is satisfactory', color: '#00e400' };</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (pm25 &lt;= 35.4) return { level: 'Moderate', desc: 'Acceptable; caution for sensitive', color: '#ffff00' };</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (pm25 &lt;= 55.4) return { level: 'Unhealthy for Sensitive', desc: 'Reduce outdoor activity', color: '#ff7e00' };</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (pm25 &lt;= 150.4) return { level: 'Unhealthy', desc: 'Everyone reduce activity', color: '#ff0000' };</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (pm25 &lt;= 250.4) return { level: 'Very Unhealthy', desc: 'Avoid outdoor activity', color: '#8f3f97' };</p>
-<p class="p1"><span class="Apple-converted-space">            </span>return { level: 'Hazardous', desc: 'Health emergency', color: '#7e0023' };</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>function generateCard() {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>statusDiv.textContent = 'Updating sensor data...';</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>fetch(`https://api.purpleair.com/v1/sensors/${sensorIndex}?fields=name,last_seen,pm2.5_atm,temperature,humidity,pressure`, {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>headers: { 'X-API-Key': apiKey }</p>
-<p class="p1"><span class="Apple-converted-space">            </span>})</p>
-<p class="p1"><span class="Apple-converted-space">            </span>.then(res =&gt; {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>if (!res.ok) throw new Error('Sensor access error (invalid key, private, or offline)');</p>
-<p class="p1"><span class="Apple-converted-space">                </span>return res.json();</p>
-<p class="p1"><span class="Apple-converted-space">            </span>})</p>
-<p class="p1"><span class="Apple-converted-space">            </span>.then(data =&gt; {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>const s = data.sensor;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>const pm25 = parseFloat(s['pm2.5_atm']) || 0;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>const aqiInfo = getAQIInfo(pm25);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>const lastUpdate = new Date(s.last_seen * 1000);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>const updateStr = lastUpdate.toLocaleString();</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.drawImage(backgroundImg, 0, 0, 800, 800);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillRect(0, 0, 800, 800);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.drawImage(logoImg, 40, 30, 140, 140);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = 'bold 52px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = 'white';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.textAlign = 'center';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText('Air Quality', 400, 100);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = '48px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText('Fajardo, Puerto Rico', 400, 160);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = 'bold 140px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = aqiInfo.color;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText(pm25.toFixed(1), 400, 330);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = '50px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = 'white';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText('µg/m³ PM2.5', 400, 390);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = 'bold 52px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = aqiInfo.color;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText(aqiInfo.level, 400, 470);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = '38px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = 'white';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText(aqiInfo.desc, 400, 520);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = '32px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.textAlign = 'left';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = 'white';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText(`Temperature: ${s.temperature ? s.temperature.toFixed(1) + '°F' : 'N/A'}`, 60, 600);</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText(`Humidity: ${s.humidity ? s.humidity.toFixed(0) + '%' : 'N/A'}`, 60, 650);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.textAlign = 'right';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText(`Updated: ${updateStr}`, 740, 650);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.textAlign = 'center';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.font = '28px Arial';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillStyle = '#a0e4ff';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>ctx.fillText('Source: Local PurpleAir Sensor | RabirubiaWeather', 400, 740);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.innerHTML = `&lt;span style="color:green;"&gt;Updated! (${updateStr})&lt;/span&gt;`;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>})</p>
-<p class="p1"><span class="Apple-converted-space">            </span>.catch(err =&gt; {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.innerHTML = `&lt;span style="color:red;"&gt;Error: ${err.message}&lt;/span&gt;`;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>});</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>let imagesLoaded = 0;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>function onImageLoad() {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>imagesLoaded++;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (imagesLoaded === 2) {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>generateCard();</p>
-<p class="p1"><span class="Apple-converted-space">                </span>setInterval(generateCard, 21600000); // Every 6 hours</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>backgroundImg.onload = onImageLoad;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>logoImg.onload = onImageLoad;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>if (backgroundImg.complete) onImageLoad();</p>
-<p class="p1"><span class="Apple-converted-space">        </span>if (logoImg.complete) onImageLoad();</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
-<p class="p1">&lt;/body&gt;</p>
-<p class="p1">&lt;/html&gt;</p>
+    <div class="card">
+        <h2>Current Air Quality - PurpleAir Sensor 130815</h2>
+        <p id="sensorName">Loading sensor info...</p>
+        <p id="location"></p>
+        <p id="lastUpdate"></p>
+        
+        <div id="pm25Section">
+            <strong>PM2.5 (µg/m³):</strong> <span id="pm25Value" class="value">-</span>
+            <span id="aqiLevel"></span>
+        </div>
+        
+        <p>Temperature: <span id="temp">-</span> °F | Humidity: <span id="humidity">-</span>% | Pressure: <span id="pressure">-</span> hPa</p>
+        
+        <button id="refreshBtn">Refresh Data</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const apiKey = 'YOUR_API_KEY_HERE'; // Replace with your PurpleAir READ API key
+        const sensorIndex = 130815;
+
+        const statusDiv = document.getElementById('status');
+        const refreshBtn = document.getElementById('refreshBtn');
+
+        function loadCurrentData() {
+            statusDiv.innerHTML = '<p>Loading current data...</p>';
+
+            // Fetch single sensor current data
+            fetch(`https://api.purpleair.com/v1/sensors/${sensorIndex}?fields=name,latitude,longitude,altitude,pm2.5_atm,temperature,humidity,pressure,last_seen,location_type`, {
+                headers: { 'X-API-Key': apiKey }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Cannot access sensor (check API key, sensor index, or if sensor is public)');
+                return res.json();
+            })
+            .then(data => {
+                const s = data.sensor;
+
+                document.getElementById('sensorName').textContent = `Sensor: ${s.name || 'Unnamed'} (Index: ${sensorIndex})`;
+                document.getElementById('location').textContent = `Location: ${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)} ${s.location_type === 0 ? '(Outdoor)' : '(Indoor)'}`;
+                
+                const lastSeen = new Date(s.last_seen * 1000);
+                document.getElementById('lastUpdate').textContent = `Last updated: ${lastSeen.toLocaleString()}`;
+
+                const pm25 = parseFloat(s['pm2.5_atm']) || 0;
+                document.getElementById('pm25Value').textContent = pm25.toFixed(1);
+
+                // Simple AQI color indication for PM2.5
+                let aqiClass = 'aqi-good';
+                let aqiText = ' (Good)';
+                if (pm25 > 50) { aqiClass = 'aqi-unhealthy'; aqiText = ' (Unhealthy)'; }
+                else if (pm25 > 12) { aqiClass = 'aqi-moderate'; aqiText = ' (Moderate)'; }
+                document.getElementById('aqiLevel').textContent = aqiText;
+                document.getElementById('aqiLevel').className = aqiClass;
+
+                document.getElementById('temp').textContent = s.temperature !== undefined ? s.temperature.toFixed(1) : 'N/A';
+                document.getElementById('humidity').textContent = s.humidity !== undefined ? s.humidity.toFixed(0) : 'N/A';
+                document.getElementById('pressure').textContent = s.pressure !== undefined ? s.pressure.toFixed(1) : 'N/A';
+
+                statusDiv.innerHTML = '<p style="color:green;">Current data loaded successfully!</p>';
+            })
+            .catch(error => {
+                statusDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+                statusDiv.innerHTML += '<p>If the sensor is new or offline, current values may be unavailable. Try refreshing later.</p>';
+                console.error(error);
+            });
+        }
+
+        // Load on page open
+        loadCurrentData();
+
+        // Refresh button
+        refreshBtn.onclick = loadCurrentData;
+    </script>
+
+    <p><strong>Notes:</strong></p>
+    <ul>
+        <li>This displays the <strong>current (real-time) readings</strong> from sensor 130815 only – no historical graph.</li>
+        <li>Data updates every ~2 minutes on PurpleAir servers.</li>
+        <li>If you see an error or no values, the sensor may be offline, private, or not yet reporting.</li>
+        <li>Click "Refresh Data" to update manually.</li>
+    </ul>
 </body>
 </html>
