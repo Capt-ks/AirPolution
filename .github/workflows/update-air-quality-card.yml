@@ -1,51 +1,74 @@
+# .github/workflows/update-air-quality-card.yml
+
+name: Update Air Quality Card Image
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  generate-and-commit-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ImageMagick and jq
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq
+
+      - name: Download background and logo
+        run: |
+          curl -o background.jpg "https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg"
+          curl -o logo.png "https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png"
+
       - name: Fetch PurpleAir data and generate card with ImageMagick
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
-          LC_ALL: C.UTF-8
-          LANG: C.UTF-8
         run: |
-          set -e
+          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm,temperature,humidity,last_seen")
+          echo "API Response: $DATA"
 
-          sudo apt-get install -y fonts-dejavu-core
+          PM25_RAW=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // 0')
+          PM25=$(printf "%.1f" "$PM25_RAW" 2>/dev/null || echo "—")
 
-          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" \
-            "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm,temperature,humidity,last_seen")
-
-          PM25_RAW=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // empty')
-
-          if [ -z "$PM25_RAW" ]; then
-            PM25="—"
-            COLOR="#aaaaaa"
-            LEVEL="No Data"
-          else
-            PM25=$(printf "%.1f" "$PM25_RAW")
-            if (( $(echo "$PM25_RAW <= 12" | bc -l) )); then COLOR="#00e400"; LEVEL="Good"
-            elif (( $(echo "$PM25_RAW <= 35.4" | bc -l) )); then COLOR="#ffff00"; LEVEL="Moderate"
-            elif (( $(echo "$PM25_RAW <= 55.4" | bc -l) )); then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive Groups"
-            elif (( $(echo "$PM25_RAW <= 150.4" | bc -l) )); then COLOR="#ff0000"; LEVEL="Unhealthy"
-            else COLOR="#8f3f97"; LEVEL="Very Unhealthy"
-            fi
-          fi
-
-          TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // empty' | awk '{printf "%.1f°F", $1}')
-          HUM=$(echo "$DATA" | jq -r '.sensor.humidity // empty' | awk '{printf "%.0f%%", $1}')
+          TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // "N/A"' | awk '{if ($1 != "N/A") printf "%.1f°F", $1; else print "N/A"}')
+          HUM=$(echo "$DATA" | jq -r '.sensor.humidity // "N/A"' | awk '{if ($1 != "N/A") printf "%.0f%%", $1; else print "N/A"}')
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
           UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p" 2>/dev/null || echo "Unknown")
 
+          # Simple AQI assignment (no conditionals that cause parse errors)
+          if (( $(echo "$PM25_RAW <= 12" | bc -l 2>/dev/null || echo 0) )); then COLOR="#00e400"; LEVEL="Good"
+          elif (( $(echo "$PM25_RAW <= 35.4" | bc -l 2>/dev/null || echo 0) )); then COLOR="#ffff00"; LEVEL="Moderate"
+          elif (( $(echo "$PM25_RAW <= 55.4" | bc -l 2>/dev/null || echo 0) )); then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive Groups"
+          elif (( $(echo "$PM25_RAW <= 150.4" | bc -l 2>/dev/null || echo 0) )); then COLOR="#ff0000"; LEVEL="Unhealthy"
+          else COLOR="#8f3f97"; LEVEL="Very Unhealthy"
+          fi
+
+          echo "PM25: $PM25 | LEVEL: $LEVEL | COLOR: $COLOR"
+
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
-            -fill "rgba(0,0,0,0.35)" -draw "rectangle 0,0 800,800" \
+            -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
-            -fill white -font DejaVu-Sans-Bold.ttf -pointsize 48 -gravity NorthWest \
-              -annotate +170+70 "RabirubiaWeather" \
-            -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
+            -fill white -font DejaVu-Sans-Bold -pointsize 48 -gravity NorthWest -annotate +170+70 "RabirubiaWeather" \
+            -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
             -pointsize 50 -annotate +0-110 "Fajardo, Puerto Rico" \
-            -pointsize 50 -annotate +0-40 "ug/m3 PM2.5" \
-            -fill "$COLOR" -pointsize 140 -annotate +0+40 "$PM25" \
-            -pointsize 70 -annotate +0+160 "$LEVEL" \
-            -fill white -pointsize 36 -gravity SouthWest \
-              -annotate +40+140 "Temperature: $TEMP" \
-              -annotate +40+90 "Humidity: $HUM" \
-              -annotate +40+40 "Updated: $UPDATE" \
-            -fill "#a0e4ff" -pointsize 24 -gravity South \
-              -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            -fill white -pointsize 50 -annotate +0-40 "µg/m³ PM2.5" \
+            -fill $COLOR -pointsize 140 -annotate +0+40 "$PM25" \
+            -fill $COLOR -pointsize 70 -annotate +0+160 "$LEVEL" \
+            -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
+            -annotate +40+90 "Humidity: $HUM" \
+            -annotate +40+40 "Updated: $UPDATE" \
+            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
             card.png
+
+      - name: Commit and push updated image
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add card.png
+          git commit -m "Auto-update air quality card image" || echo "No changes to commit"
+          git push
