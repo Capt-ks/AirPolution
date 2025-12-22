@@ -29,22 +29,24 @@ jobs:
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
-          # Fetch data from sensor 281250
-          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=pm2.5_atm,temperature,humidity,last_seen")
-          echo "API Response: $DATA"
-
-          # Extract PM2.5 as string, fallback to "—"
-          PM25=$(echo "$DATA" | jq -r '.sensor.pm2.5_atm // "—"')
-          if [ "$PM25" != "—" ]; then
-            PM25=$(printf "%.1f" "$PM25")
-          fi
-
+          # Fetch data
+          DATA=$(curl -s -H "X-API-Key: $PURPLEAIR_API_KEY" "https://api.purpleair.com/v1/sensors/281250?fields=name,pm2.5_atm,temperature,humidity,last_seen")
+          PM25=$(echo "$DATA" | jq -r '.sensor["pm2.5_atm"] // 0' | awk '{printf "%.1f", $1}')
           TEMP=$(echo "$DATA" | jq -r '.sensor.temperature // "N/A"' | awk '{if ($1 != "N/A") printf "%.1f°F", $1; else print "N/A"}')
           HUM=$(echo "$DATA" | jq -r '.sensor.humidity // "N/A"' | awk '{if ($1 != "N/A") printf "%.0f%%", $1; else print "N/A"}')
           LAST_SEEN=$(echo "$DATA" | jq -r '.sensor.last_seen // 0')
           if [ "$LAST_SEEN" -eq 0 ]; then UPDATE="Unknown"; else UPDATE=$(date -d "@$LAST_SEEN" "+%b %d, %Y %I:%M %p"); fi
 
-          # Generate card – big PM2.5 value in white, no level text or color logic
+          # Determine AQI color and level only (no "Hazardous" text or desc)
+          if [ $(awk "BEGIN {print ($PM25 <= 12)}") -eq 1 ]; then COLOR="#00e400"; LEVEL="Good"
+          elif [ $(awk "BEGIN {print ($PM25 <= 35.4)}") -eq 1 ]; then COLOR="#ffff00"; LEVEL="Moderate"
+          elif [ $(awk "BEGIN {print ($PM25 <= 55.4)}") -eq 1 ]; then COLOR="#ff7e00"; LEVEL="Unhealthy for Sensitive Groups"
+          elif [ $(awk "BEGIN {print ($PM25 <= 150.4)}") -eq 1 ]; then COLOR="#ff0000"; LEVEL="Unhealthy"
+          elif [ $(awk "BEGIN {print ($PM25 <= 250.4)}") -eq 1 ]; then COLOR="#8f3f97"; LEVEL="Very Unhealthy"
+          else COLOR="#ffffff"; LEVEL="Data Unavailable"  # White for no alarming text when offline
+          fi
+
+          # Generate card – lighter overlay, smaller footer, no desc
           convert background.jpg -resize 800x800^ -gravity center -crop 800x800+0+0 +repage \
             -fill 'rgba(0,0,0,0.35)' -draw "rectangle 0,0 800,800" \
             \( logo.png -resize 120x120 \) -gravity NorthWest -geometry +40+40 -composite \
@@ -52,7 +54,8 @@ jobs:
             -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
             -pointsize 50 -annotate +0-110 "Fajardo, Puerto Rico" \
             -fill white -pointsize 50 -annotate +0-40 "µg/m³ PM2.5" \
-            -fill white -pointsize 160 -annotate +0+40 "$PM25" \
+            -fill $COLOR -pointsize 140 -annotate +0+40 "$PM25" \
+            -fill $COLOR -pointsize 70 -annotate +0+160 "$LEVEL" \
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
