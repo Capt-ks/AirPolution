@@ -11,13 +11,14 @@ jobs:
   generate-and-commit-image:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Essential for git push
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install system dependencies (for libvips/sharp)
+        run: sudo apt-get update && sudo apt-get install -y libvips-dev
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -27,78 +28,64 @@ jobs:
       - name: Install sharp
         run: npm install sharp
 
-      - name: Generate card image with sharp
+      - name: Generate card image
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
           node -e '
           const sharp = require("sharp");
-          const fetch = global.fetch; // Node 20 has built-in fetch
 
           (async () => {
             const apiKey = process.env.PURPLEAIR_API_KEY;
-            if (!apiKey) throw new Error("No API key provided");
+            if (!apiKey) throw new Error("No API key");
 
-            const res = await fetch(`https://api.purpleair.com/v1/sensors/130815?fields=name,last_seen,pm2.5_atm,temperature,humidity,pressure`, {
+            const res = await fetch(`https://api.purpleair.com/v1/sensors/130815?fields=pm2.5_atm,temperature,humidity,last_seen`, {
               headers: { "X-API-Key": apiKey }
             });
-            if (!res.ok) {
-              const errText = await res.text();
-              throw new Error(`API error ${res.status}: ${errText}`);
-            }
+            if (!res.ok) throw new Error("API error: " + await res.text());
             const data = await res.json();
             const s = data.sensor;
-            const pm25 = parseFloat(s["pm2.5_atm"]) || 0;
-            const temp = s.temperature !== undefined ? s.temperature.toFixed(1) + "°F" : "N/A";
-            const hum = s.humidity !== undefined ? s.humidity.toFixed(0) + "%" : "N/A";
+            const pm25 = parseFloat(s.pm2.5_atm) || 0;
+            const temp = s.temperature ? s.temperature.toFixed(1) + "°F" : "N/A";
+            const hum = s.humidity ? s.humidity.toFixed(0) + "%" : "N/A";
             const updateStr = new Date(s.last_seen * 1000).toLocaleString();
 
-            function getAQIColor(p) {
-              if (p <= 12.0) return "#00e400";
-              if (p <= 35.4) return "#ffff00";
-              if (p <= 55.4) return "#ff7e00";
-              if (p <= 150.4) return "#ff0000";
-              if (p <= 250.4) return "#8f3f97";
-              return "#7e0023";
-            }
-            const aqiColor = getAQIColor(pm25);
+            const aqiColor = pm25 <= 12 ? "#00e400" : pm25 <= 35.4 ? "#ffff00" : pm25 <= 55.4 ? "#ff7e00" : pm25 <= 150.4 ? "#ff0000" : pm25 <= 250.4 ? "#8f3f97" : "#7e0023";
 
-            // Download images
-            const [bgRes, logoRes] = await Promise.all([
-              fetch("https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg"),
-              fetch("https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png")
+            const aqiLevel = pm25 <= 12 ? "Good" : pm25 <= 35.4 ? "Moderate" : pm25 <= 55.4 ? "Unhealthy for Sensitive" : pm25 <= 150.4 ? "Unhealthy" : pm25 <= 250.4 ? "Very Unhealthy" : "Hazardous";
+
+            const aqiDesc = pm25 <= 12 ? "Air quality is satisfactory" : pm25 <= 35.4 ? "Acceptable; caution for sensitive" : pm25 <= 55.4 ? "Reduce outdoor activity" : pm25 <= 150.4 ? "Everyone reduce activity" : pm25 <= 250.4 ? "Avoid outdoor activity" : "Health emergency";
+
+            const [bgBuffer, logoBuffer] = await Promise.all([
+              (await fetch("https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg")).arrayBuffer(),
+              (await fetch("https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png")).arrayBuffer()
             ]);
-            const bgBuffer = Buffer.from(await bgRes.arrayBuffer());
-            const logoBuffer = Buffer.from(await logoRes.arrayBuffer());
 
-            // Create SVG overlay with all text
-            const svgOverlay = `
+            const svgOverlay = Buffer.from(\`
             <svg width="800" height="800" xmlns="http://www.w3.org/2000/svg">
               <rect width="800" height="800" fill="rgba(0,0,0,0.55)"/>
-              <image href="data:image/png;base64,${logoBuffer.toString('base64')}" x="40" y="30" width="140" height="140"/>
-              <text x="400" y="100" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="bold" fill="white" text-anchor="middle">Air Quality</text>
-              <text x="400" y="160" font-family="Arial, Helvetica, sans-serif" font-size="48" fill="white" text-anchor="middle">Fajardo, Puerto Rico</text>
-              <text x="400" y="330" font-family="Arial, Helvetica, sans-serif" font-size="140" font-weight="bold" fill="${aqiColor}" text-anchor="middle">${pm25.toFixed(1)}</text>
-              <text x="400" y="390" font-family="Arial, Helvetica, sans-serif" font-size="50" fill="white" text-anchor="middle">µg/m³ PM2.5</text>
-              <text x="400" y="470" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="bold" fill="${aqiColor}" text-anchor="middle">${pm25 <= 12 ? "Good" : pm25 <= 35.4 ? "Moderate" : pm25 <= 55.4 ? "Unhealthy for Sensitive" : pm25 <= 150.4 ? "Unhealthy" : pm25 <= 250.4 ? "Very Unhealthy" : "Hazardous"}</text>
-              <text x="400" y="520" font-family="Arial, Helvetica, sans-serif" font-size="38" fill="white" text-anchor="middle">${pm25 <= 12 ? "Air quality is satisfactory" : pm25 <= 35.4 ? "Acceptable; caution for sensitive" : pm25 <= 55.4 ? "Reduce outdoor activity" : pm25 <= 150.4 ? "Everyone reduce activity" : pm25 <= 250.4 ? "Avoid outdoor activity" : "Health emergency"}</text>
-              <text x="60" y="600" font-family="Arial, Helvetica, sans-serif" font-size="32" fill="white">Temperature: ${temp}</text>
-              <text x="60" y="650" font-family="Arial, Helvetica, sans-serif" font-size="32" fill="white">Humidity: ${hum}</text>
-              <text x="740" y="650" font-family="Arial, Helvetica, sans-serif" font-size="32" fill="white" text-anchor="end">Updated: ${updateStr}</text>
-              <text x="400" y="740" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#a0e4ff" text-anchor="middle">Source: Local PurpleAir Sensor | RabirubiaWeather</text>
-            </svg>`;
+              <image href="data:image/png;base64,\${Buffer.from(logoBuffer).toString('base64')}" x="40" y="30" width="140" height="140"/>
+              <text x="400" y="100" font-family="Arial" font-size="52" font-weight="bold" fill="white" text-anchor="middle">Air Quality</text>
+              <text x="400" y="160" font-family="Arial" font-size="48" fill="white" text-anchor="middle">Fajardo, Puerto Rico</text>
+              <text x="400" y="330" font-family="Arial" font-size="140" font-weight="bold" fill="\${aqiColor}" text-anchor="middle">\${pm25.toFixed(1)}</text>
+              <text x="400" y="390" font-family="Arial" font-size="50" fill="white" text-anchor="middle">µg/m³ PM2.5</text>
+              <text x="400" y="470" font-family="Arial" font-size="52" font-weight="bold" fill="\${aqiColor}" text-anchor="middle">\${aqiLevel}</text>
+              <text x="400" y="520" font-family="Arial" font-size="38" fill="white" text-anchor="middle">\${aqiDesc}</text>
+              <text x="60" y="600" font-family="Arial" font-size="32" fill="white">Temperature: \${temp}</text>
+              <text x="60" y="650" font-family="Arial" font-size="32" fill="white">Humidity: \${hum}</text>
+              <text x="740" y="650" font-family="Arial" font-size="32" fill="white" text-anchor="end">Updated: \${updateStr}</text>
+              <text x="400" y="740" font-family="Arial" font-size="28" fill="#a0e4ff" text-anchor="middle">Source: Local PurpleAir Sensor | RabirubiaWeather</text>
+            </svg>
+            \`);
 
-            await sharp(bgBuffer)
-              .composite([{
-                input: Buffer.from(svgOverlay),
-                gravity: "northwest"
-              }])
-              .png({ quality: 100 })
+            await sharp(Buffer.from(bgBuffer))
+              .composite([{ input: svgOverlay }])
+              .png()
               .toFile("card.png");
 
             console.log("card.png generated successfully");
           })().catch(err => {
-            console.error("Error:", err.message || err);
+            console.error("Error:", err.message);
             process.exit(1);
           });
           '
@@ -108,5 +95,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add card.png
-          git commit -m "Auto-update air quality card image" || echo "No changes to commit"
+          git commit -m "Auto-update air quality card image" || echo "No changes"
           git push
