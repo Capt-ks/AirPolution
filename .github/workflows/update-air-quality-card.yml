@@ -10,118 +10,87 @@ on:
 jobs:
   generate-and-commit-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for pushing commits
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install system dependencies for node-canvas
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Default token has write permission
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install canvas
-        run: npm install canvas
+      - name: Install sharp
+        run: npm install sharp
 
-      - name: Generate card image
+      - name: Generate card image with sharp
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
         run: |
           node -e '
-          const { createCanvas, loadImage } = require("canvas");
+          const sharp = require("sharp");
+          const fetch = require("node-fetch");
           const fs = require("fs");
 
           (async () => {
             const apiKey = process.env.PURPLEAIR_API_KEY;
-            if (!apiKey) throw new Error("No API key provided");
+            if (!apiKey) throw new Error("No API key");
 
-            const sensorIndex = 130815;
-            const response = await fetch(`https://api.purpleair.com/v1/sensors/${sensorIndex}?fields=name,last_seen,pm2.5_atm,temperature,humidity,pressure`, {
+            const res = await fetch("https://api.purpleair.com/v1/sensors/130815?fields=name,last_seen,pm2.5_atm,temperature,humidity,pressure", {
               headers: { "X-API-Key": apiKey }
             });
-
-            if (!response.ok) {
-              const errText = await response.text();
-              throw new Error(`API error ${response.status}: ${errText}`);
-            }
-
-            const data = await response.json();
+            if (!res.ok) throw new Error("API error: " + await res.text());
+            const data = await res.json();
             const s = data.sensor;
             const pm25 = parseFloat(s["pm2.5_atm"]) || 0;
-            const temp = s.temperature !== undefined ? s.temperature.toFixed(1) + "°F" : "N/A";
-            const hum = s.humidity !== undefined ? s.humidity.toFixed(0) + "%" : "N/A";
+            const temp = s.temperature ? s.temperature.toFixed(1) + "°F" : "N/A";
+            const hum = s.humidity ? s.humidity.toFixed(0) + "%" : "N/A";
             const updateStr = new Date(s.last_seen * 1000).toLocaleString();
 
             function getAQIInfo(p) {
-              if (p <= 12.0) return { level: "Good", desc: "Air quality is satisfactory", color: "#00e400" };
-              if (p <= 35.4) return { level: "Moderate", desc: "Acceptable; caution for sensitive", color: "#ffff00" };
-              if (p <= 55.4) return { level: "Unhealthy for Sensitive", desc: "Reduce outdoor activity", color: "#ff7e00" };
-              if (p <= 150.4) return { level: "Unhealthy", desc: "Everyone reduce activity", color: "#ff0000" };
-              if (p <= 250.4) return { level: "Very Unhealthy", desc: "Avoid outdoor activity", color: "#8f3f97" };
-              return { level: "Hazardous", desc: "Health emergency", color: "#7e0023" };
+              if (p <= 12.0) return { level: "Good", desc: "Air quality is satisfactory", color: { r: 0, g: 228, b: 0 } };
+              if (p <= 35.4) return { level: "Moderate", desc: "Acceptable; caution for sensitive", color: { r: 255, g: 255, b: 0 } };
+              if (p <= 55.4) return { level: "Unhealthy for Sensitive", desc: "Reduce outdoor activity", color: { r: 255, g: 126, b: 0 } };
+              if (p <= 150.4) return { level: "Unhealthy", desc: "Everyone reduce activity", color: { r: 255, g: 0, b: 0 } };
+              if (p <= 250.4) return { level: "Very Unhealthy", desc: "Avoid outdoor activity", color: { r: 143, g: 63, b: 151 } };
+              return { level: "Hazardous", desc: "Health emergency", color: { r: 126, g: 0, b: 35 } };
             }
             const aqi = getAQIInfo(pm25);
 
-            const canvas = createCanvas(800, 800);
-            const ctx = canvas.getContext("2d");
+            // Download background and logo
+            const bgRes = await fetch("https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg");
+            const bgBuffer = await bgRes.arrayBuffer();
+            const logoRes = await fetch("https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png");
+            const logoBuffer = await logoRes.arrayBuffer();
 
-            const bg = await loadImage("https://www.puertorico.com/wp-content/uploads/2023/05/seven-seas-beach-min.jpg");
-            ctx.drawImage(bg, 0, 0, 800, 800);
+            const svgText = `
+            <svg width="800" height="800">
+              <rect width="800" height="800" fill="rgba(0,0,0,0.55)"/>
+              <image href="data:image/png;base64,${Buffer.from(logoBuffer).toString("base64")}" x="40" y="30" width="140" height="140"/>
+              <text x="400" y="100" font-family="Arial" font-size="52" font-weight="bold" fill="white" text-anchor="middle">Air Quality</text>
+              <text x="400" y="160" font-family="Arial" font-size="48" fill="white" text-anchor="middle">Fajardo, Puerto Rico</text>
+              <text x="400" y="330" font-family="Arial" font-size="140" font-weight="bold" fill="rgb(${aqi.color.r},${aqi.color.g},${aqi.color.b})" text-anchor="middle">${pm25.toFixed(1)}</text>
+              <text x="400" y="390" font-family="Arial" font-size="50" fill="white" text-anchor="middle">µg/m³ PM2.5</text>
+              <text x="400" y="470" font-family="Arial" font-size="52" font-weight="bold" fill="rgb(${aqi.color.r},${aqi.color.g},${aqi.color.b})" text-anchor="middle">${aqi.level}</text>
+              <text x="400" y="520" font-family="Arial" font-size="38" fill="white" text-anchor="middle">${aqi.desc}</text>
+              <text x="60" y="600" font-family="Arial" font-size="32" fill="white">Temperature: ${temp}</text>
+              <text x="60" y="650" font-family="Arial" font-size="32" fill="white">Humidity: ${hum}</text>
+              <text x="740" y="650" font-family="Arial" font-size="32" fill="white" text-anchor="end">Updated: ${updateStr}</text>
+              <text x="400" y="740" font-family="Arial" font-size="28" fill="#a0e4ff" text-anchor="middle">Source: Local PurpleAir Sensor | RabirubiaWeather</text>
+            </svg>`;
 
-            ctx.fillStyle = "rgba(0,0,0,0.55)";
-            ctx.fillRect(0, 0, 800, 800);
+            await sharp(Buffer.from(bgBuffer))
+              .composite([{ input: Buffer.from(svgText), blend: "over" }])
+              .png()
+              .toFile("card.png");
 
-            const logo = await loadImage("https://static.wixstatic.com/media/80c250_b1146919dfe046429a96648c59e2c413~mv2.png/v1/fill/w_234,h_234,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/RWRoundLogoTransp.png");
-            ctx.drawImage(logo, 40, 30, 140, 140);
-
-            ctx.textAlign = "center";
-            ctx.fillStyle = "white";
-
-            ctx.font = "bold 52px Arial";
-            ctx.fillText("Air Quality", 400, 100);
-            ctx.font = "48px Arial";
-            ctx.fillText("Fajardo, Puerto Rico", 400, 160);
-
-            ctx.font = "bold 140px Arial";
-            ctx.fillStyle = aqi.color;
-            ctx.fillText(pm25.toFixed(1), 400, 330);
-
-            ctx.font = "50px Arial";
-            ctx.fillStyle = "white";
-            ctx.fillText("µg/m³ PM2.5", 400, 390);
-
-            ctx.font = "bold 52px Arial";
-            ctx.fillStyle = aqi.color;
-            ctx.fillText(aqi.level, 400, 470);
-
-            ctx.font = "38px Arial";
-            ctx.fillStyle = "white";
-            ctx.fillText(aqi.desc, 400, 520);
-
-            ctx.font = "32px Arial";
-            ctx.textAlign = "left";
-            ctx.fillStyle = "white";
-            ctx.fillText(`Temperature: ${temp}`, 60, 600);
-            ctx.fillText(`Humidity: ${hum}`, 60, 650);
-
-            ctx.textAlign = "right";
-            ctx.fillText(`Updated: ${updateStr}`, 740, 650);
-
-            ctx.textAlign = "center";
-            ctx.font = "28px Arial";
-            ctx.fillStyle = "#a0e4ff";
-            ctx.fillText("Source: Local PurpleAir Sensor | RabirubiaWeather", 400, 740);
-
-            const buffer = canvas.toBuffer("image/png");
-            fs.writeFileSync("card.png", buffer);
-            console.log("card.png generated successfully");
+            console.log("card.png generated successfully with sharp");
           })().catch(err => {
-            console.error("Generation error:", err);
+            console.error("Error:", err);
             process.exit(1);
           });
           '
