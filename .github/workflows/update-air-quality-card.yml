@@ -59,7 +59,7 @@ jobs:
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
-            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather.com" \
+            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: PurpleAir local Sensor | RabirubiaWeather.com" \
             card.png
 
       - name: Commit and push updated image
