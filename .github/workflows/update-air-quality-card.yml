@@ -54,12 +54,12 @@ jobs:
             -fill white -pointsize 60 -gravity center -annotate +0-180 "Air Quality" \
             -pointsize 50 -annotate +0-110 "Fajardo, Puerto Rico" \
             -fill white -pointsize 50 -annotate +0-40 "µg/m³ PM2.5" \
-            -fill $COLOR -pointsize 140 -annotate +0+40 "$PM25" \
+            -fill $COLOR -pointsize 80 -annotate +0+40 "$PM25" \
             -fill $COLOR -pointsize 70 -annotate +0+160 "$LEVEL" \
             -pointsize 36 -gravity SouthWest -annotate +40+140 "Temperature: $TEMP" \
             -annotate +40+90 "Humidity: $HUM" \
             -annotate +40+40 "Updated: $UPDATE" \
-            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather" \
+            -fill '#a0e4ff' -pointsize 24 -gravity South -annotate +0+15 "Source: Local PurpleAir Sensor | RabirubiaWeather.com" \
             card.png
 
       - name: Commit and push updated image
